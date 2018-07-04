@@ -1,6 +1,11 @@
+/*
+ * Altimeter based on the freetronics unit.
+*/
 #include <Wire.h>
 #include <LiquidCrystal.h>
 #include <BaroSensor.h> 
+
+#define DEBUG_PRG 1
 
 //Constants used in altitude calculation.
 #define P_SEA_LEVEL 101325.0f
@@ -9,6 +14,7 @@
 #define TEMP_GRAD   -0.0065f
 #define GRAV        9.80665f
 #define PR_EXP (( GAS_CONST * TEMP_GRAD) / GRAV )
+
 //ONE millibar  = 100 n/m^2
 #define MBAR_NM2(x) ( x * 100 )
 
@@ -26,7 +32,8 @@ unsigned int altMode = MODE_QNE;
 #define DOWN_ADC   329
 #define LEFT_ADC   505
 #define SELECT_ADC 741
-#define HYSTERESIS 10
+//Change hystersis if select_adc or any other button fails to work.
+#define HYSTERESIS 20
 
 //return values for readButtons()
 #define BUTTON_NONE   0
@@ -48,13 +55,18 @@ float qne = 1013.25f;      //Std presure dataum, fixed.
 //display refressh
 unsigned long oldTime;
 unsigned long curTime;
+//unsigned long startTime;
 
 //Standard freetronics LCD setup
 LiquidCrystal lcd( 8,9,4,5,6,7 );
+
+
 void setup(void)
 {
   //debugging
-  Serial.begin(9600);
+
+  //Serial.begin(9600);
+
 
   //Keypad input setup
   pinMode( BUTTON_ADC_PIN, INPUT );
@@ -68,7 +80,10 @@ void setup(void)
   lcd.begin( 16, 2);
   lcd.print("Altimeter");
   altimeter_setup();
+  
+  //timer's for display refresh and baro reset.
   oldTime = millis();
+  //startTime = oldTime;
 }
 
 //float pressure = 1013.25f;
@@ -82,17 +97,15 @@ void loop(void)
   byte adcButton;
   curTime = millis();
   
-  //get the current input state
+  //get the current input state, can cause issues if resistances change
+  
   if((adcButton = readButtons()) == BUTTON_SELECT)
   {
     //key time out, could add milis() timer
     delay(250);
     altimeter_setup();
   }
-
-  
-
-  if(!BaroSensor.isOK()) //repace the ! for release...
+   else  if(!BaroSensor.isOK()) 
   {
     lcd.setCursor(0,0);
     lcd.print("Sensor not found" );
@@ -100,33 +113,45 @@ void loop(void)
     lcd.print("error code: ");
     lcd.print(BaroSensor.getError());
     BaroSensor.begin();
+    //If the sensor is reset
+    delay(25000);
   }
-  else if ((curTime - oldTime) > 250 )
+  else if ((curTime - oldTime) >  300 ) //300 seems ok
   {
-    lcd.clear();
     
-    //BaroSensor returns mBar as a FLOAT
-    baroReading = BaroSensor.getPressure(); //- (float)( 2 * 101325);
-  
-   //float dp = 0.016f;
-
+    lcd.clear();
     lcd.setCursor(0,0);
     lcd.print("Altitude:");
 
+    //Print display mode
     if( altMode == MODE_QFE ) lcd.print(" QFE");
     else if( altMode == MODE_QNH ) lcd.print( "QNH");
     else lcd.print(" QNE");
-
-    Serial.println( baroReading );
-
+    
+    //print reading
     lcd.setCursor(0,1);
-    //lcd.print( get_height( pressure ) );
     lcd.print( get_height( baroReading*100 ));
     lcd.print(" meters");
-    //pressure -= dp;
     
     oldTime = curTime;
   }
+  else //read Sensor
+  {
+    const int MAX_READINGS = 25;
+    baroReading = 0.0f;
+    
+    //Average of ten readings
+    for( int i = 0; i < MAX_READINGS ; i++)
+    {
+      //BaroSensor returns mBar as a FLOAT
+      baroReading += BaroSensor.getPressure(); //- (float)( 2 * 101325);
+    }
+    //average result.
+    baroReading = baroReading / (float)MAX_READINGS;
+  }
+
+  //Serial.println(adcButton );
+
 }  
 
 /*
@@ -251,7 +276,66 @@ float setBase( unsigned int mode )
     break; 
   }
 }  
+/*
+  Zero the altimeter to current airPressure
+ */
+ float setZero()
+ {
+   byte adcButton;
+   float oldQFE = qfe;
+   const int MAX_READINGS = 100;
+   float baroResult = 0.0f;
+   unsigned int cursLoc = 0;
+   
+   //ask to zero
+   lcd.clear();
+   lcd.setCursor( 0, 0);
+   lcd.print("QFE Zero");
+   lcd.setCursor( 0, 1);
+   lcd.print("Y/N");
+   //Turn on Cursor
+   lcd.cursor();
+   
+   while( ((adcButton = readButtons()) != BUTTON_SELECT) )
+   {
+     if( adcButton == BUTTON_LEFT )
+     {
+       if( cursLoc != 0 ) --cursLoc;
+       if(cursLoc == 1 ) cursLoc = 0;
+     }
+     if( adcButton == BUTTON_RIGHT )
+     {
+       if( cursLoc != 2 ) ++cursLoc;
+       if(cursLoc == 1 ) cursLoc = 2;
+     }
+     lcd.setCursor( cursLoc, 1 );
+   }
 
+   
+    //turn off the cursor
+    lcd.noCursor();
+      
+   if( cursLoc == 0 )
+   { 
+      lcd.clear();
+      lcd.setCursor( 0, 0);
+      lcd.print("QFE Zeroing");
+      
+      //Read sensor MAX_READINGS amount
+      for( int i = 0; i < MAX_READINGS ; i++)
+      {
+        //BaroSensor returns mBar as a FLOAT
+        baroResult += BaroSensor.getPressure(); 
+        //update zero bargraph
+      }
+      //average result.
+      oldQFE = baroResult / (float)MAX_READINGS;
+    }
+    
+
+    return oldQFE;
+ }
+ 
 /*
  Select the mode in which the altimeter is to run in
 */
@@ -336,6 +420,8 @@ void altimeter_setup(void)
   delay(250);
   altMode = setMode();
   delay(250);
+  qfe = setZero();
+  delay(250); //delay's are used as a debounce measure
 }
 
 /*

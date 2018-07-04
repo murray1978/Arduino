@@ -1,0 +1,95 @@
+/*
+ emu86, 86 emulator for arduino,
+ Microcomputer systems: the 8088/8086 family, 2nd Ed, Prentice-Hall
+ used as a refrence.
+ Murray Smith, 4/4/14
+ */
+#include "regs.h"
+#include "cpu.h"
+#include "opcodes.h"
+#include "memory.h"
+#include "opcode_table.h"
+
+cpu_t cpu86;
+
+void setFlagPSW( byte &psw, byte flag){
+  psw |= flag;
+}
+
+//Decode and return true if a flag is set.
+boolean decodePSW( byte psw, byte flag ){
+  byte temp = psw;
+  if( flag == FLAG_CF ){
+    return temp & 1;
+  }
+  return (( temp >> flag ) & 1);
+}
+
+/*
+  Reset the cpu to a known state.
+  CS, DS, SS, ES need to point to a valid segment ie ROM_SEGMENT
+  SP, BP, SI, DI, IP need the correct values for the cpu to find 
+  data/code/stack at start up
+*/
+void cpu_reset(){
+  //clear registers, program status word.
+  cpu86.psw = 0;
+
+  //general purpose
+  cpu86.regs.ax = 0;
+  cpu86.regs.bx = 0;
+  cpu86.regs.cx = 0;
+  cpu86.regs.dx = 0;
+
+  //ponters
+  cpu86.regs.sp = 0;
+  cpu86.regs.bp = 0;
+  cpu86.regs.si = 0;
+  cpu86.regs.di = 0;
+  cpu86.regs.ip = 0;
+
+  //segments
+  cpu86.regs.cs = 0;
+  cpu86.regs.ss = 0;
+  cpu86.regs.ds = 0;
+  cpu86.regs.es = 0;
+}
+
+//
+void genAddress(){
+  //cpu86.addressBus = 0;
+}
+
+void init_ram( byte *ram, int len ){
+  int i = 0;
+  for( i = 0; i < len; i++ ){
+    ram[i] = 0;
+  }
+}
+
+void setup(){
+  //Serial.begin(9600); //about 1k of code.
+  cpu_reset();
+  init_ram( mem_ram256, 255);
+  init_ram( mem_low1024, 1023);
+  //genAddress(cpu86);
+}
+
+//which opcode are we using
+byte opcode = 0;
+//displacement from current address, with in current segment.
+int addressOffset = 0;
+
+void loop(){
+
+  //get 6 bytes of code into cpu86.i_q
+  //decode first byte, via
+  //genAddress(cpu86);
+  inc_ip(addressOffset);
+  opcode = cpu86.i_q[0];
+  addressOffset = opcode_table[opcode].opcode_handler();
+  //shift data via data/address/status pins
+}
+
+
+

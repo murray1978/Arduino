@@ -1,0 +1,54 @@
+#ifndef __MEMORY_H__
+#define __MEMORY_H__
+#include "arduino.h"
+
+/*
+ Memory Bounderies
+*/
+ #define ROM_START 0xfffff0
+ #define ROM_END   0xffffff
+ #define IVT_START 0
+ #define IVT_END   0x3ff
+ #define RAM_START 0x400
+ #define RAM_SIZE  0xff
+ #define RAM_END   RAM_START + RAM_SIZE
+
+/*
+  use up about 1k of precious ram
+  64k segments.
+  16 byte 
+  For starter's.
+  	Rom starts at processor initalisation point, for 1/4 segment?
+  	Ram starts at 0x0000 for IVT (and GDT?)
+  Memory map...
+     0x0 -> 0x3ff
+     	IVT
+     0xfffff0 -> 0xfffff
+     	Boot strap / BIOS
+     0x400 -> 0xfffef
+     	RAM 
+*/
+  /*typedef struct mem_s{
+  		int size;
+  		byte *data;
+  }mem_t;
+
+mem_t mem_ram256;
+
+mem_t mem_rom256 = {
+	2,
+	{0x00,0x00}
+}*/
+
+
+//Ram starts at low address 0x400
+byte mem_ram256[255];
+//IVT and GDT ram. starts at 0x0000. ends at 0x3ff
+byte mem_low1024[1023];
+//Rom starts at high address 0xffff0  ends at 0xfffff
+int rom_size = 5;
+byte mem_rom256[] = {
+
+};
+
+#endif

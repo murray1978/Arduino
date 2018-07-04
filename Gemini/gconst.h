@@ -1,0 +1,4 @@
+/*
+ * Gemini constants
+*/
+#pragma once
