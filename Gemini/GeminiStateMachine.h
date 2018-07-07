@@ -1,127 +1,133 @@
 /*
  * The flow diagrams for Matghflow 7 are a state machine.
  * Trying to keep the flow as close as possible to the diagrams.
+ * =============================================================
+ * Program reports several messages via serial
+ * Gemini FC: functions, methods, dataflow from MathFlow 7
+ * Gemini DB: debug messages
+ * Gemini DA: data messages
+ * Gemini ER: error messages
+ * Gemini WR: warning messages
+ * Gemini INF: info messages
 */
 #pragma once
+#include "common.h"
 
-#define uchar_t unsigned char
-#define uint_t  unsigned int
-#define TRUE 1
-#define FALSE !TRUE
 
-#define KWNO  5.2593  // B4
-#define KP220 175     // B10 sec
-#define KVGO  750     // B15 ft/sec
-#define KVAO  150     // B15 ft/sec
-#define KIFO  250     // B10 ft/sec
-#define KQO   1.66    // B4
-#define KP12  100     // B17 sec
-#define KP104 PI/2    // B3 ad
-#define KXAO  0       // B25 ft
-#define KZA0  0       // B25 ft
-#define KYA0  -20909749  // B25 ft
-#define KP226 0.5     // B1
-#define KP336 0.93969 // B1
-#define KTST2 156.1   // B17 sec 
-
-struct STATES{
-   uchar_t LC18:1;
-   uchar_t LC20:1;
-   uchar_t LC21:1;
-   uchar_t LC24:1;
-   uchar_t LC29:1;
-   uchar_t LC17:1;
-   uchar_t LC4A:1; // 
-   uchar_t LC4B:1;
-   uchar_t LC4C:1;  
-   uchar_t LC4D:1;
-   uchar_t LC4E:1;
-   uchar_t DO61:1;  //
-   uchar_t DO62:1; 
-   uchar_t DO05:1;
-   uchar_t DO64:1;
-};
-
-struct GIMBAL{
-  int x;
-  int y;
-  int z;
-  int dx;
-  int dy;
-  int dz;
-};
-
-struct ACCELERATION
+void dcsSUB()
 {
-  int x;
-  int y;
-  int z;
-  int dx;
-  int dy;
-  int dz;
-};
+  Serial.println("Gemini FC: dcsSUB()");
+}
 
-struct VALUES
+void dasSUB()
 {
-  //59, pg17
-  long Wno;     //kinematic value, time step?
-  int Vg;       //Velocity loss due to gravity
-  int af;       //Final value of thrust acceleration
-  int qno;      //?
-  long thetaN;  //gimbal angle
-  int zni;       
-  int cp150;
-  int tr;       //time to start roll program
-};
+  Serial.println("Gemini FC: dasSUB()");
+}
 
-uint_t CP135, CP136, CP137;
+void ioa(){
+  Serial.println("Gemini FC: ioa()");
+}
 
-struct STATES state;
-struct GIMBAL gimbal;
-struct ACCELERATION accel;
-struct VLAUES values;
-
-void ioa(){}
-void io(){}
+void io(){
+  Serial.println("Gemini FC: io()");
+}
 
 //94.4
-void iosub(){}
+void iosub(){
+  Serial.println("Gemini FC: iosub()");
+  if( logicContol.LC17 == FALSE )
+  {
+    return;
+  }
+  logicContol.LC17 = FALSE;
 
-void gonogo(){}
-void gclock(){}
+  if( logicContol.LC30 == TRUE || logicContol.LC4E == TRUE )
+  {
+    //set:HOPc = L(94.5)
+    dcsSUB();
+  }
+
+  //set:HOPc = L(94.6)
+  dasSUB();
+
+  //Yaw ladder buffer
+  dout.DO03 = 0; // Cp165,  Delta b0 range, 
+  dout.DO44 = 0; //- SET LADDER BUFFER
+  values.acc = dout.DO44 + KP367; //Delta Yaw @ n
+  //write(acc)(17), yaw to output
+  
+  values.acc = KP361; //delay
+  while( values.acc-- != 0 );
+
+  dout.DO44 = 1; //Reset ladder bufferS
+  dout.DO02 = values.CP164; //Delta Pitch
+  
+}
+
+void gonogo(){
+  Serial.println("Gemini FC: gonogo()");
+}
+
+void gclock(){
+  Serial.println("Gemini FC: gclock()");
+}
 
 //29.1 gimbal angle
-void gimbalAngle(){}
+void gimbalAngle()
 {
+  Serial.println("Gemini FC: gimbalAngle()");
   //i2c read of gimbals
 }
 
-uchar_t age(){ return FALSE; }
-uchar_t modeControlDI11(){ return FALSE; }
-uchar_t modeControlDI10(){ return FALSE; }
-uchar_t modeControlDI13(){ return FALSE; }
+uchar_t age(){
+  Serial.println("Gemini FC: age()"); 
+  return TRUE; 
+}
 
+void mdiuSub()
+{
+  Serial.println("Gemini FC: mdiuSub()");
+
+  if( din.DI04 == TRUE ){
+  
+  }
+  //55.9
+  int cd = 1; //Count of digits inserted
+  logicControl.LC23 = TRUE;
+  logicControl.LC15 = TRUE;
+N5512:
+  dout.DO40 = TRUE; //insert Light off
+  // RESET insert,
+  // Display Clear
+  // D1,2,4,4
+  dout.DO41 = TRUE; //Turn off display
+  logicControl.LC16 = TRUE;  
+}
 //And the big flight logic
 void geminiFlightLogic()
 {
+  Serial.println("Gemini FC: start up");
   //Page 23, COL 78
-  state.LC4A = TRUE;
-  state.LC4B = TRUE;
-  state.LC4C = TRUE;
-  state.LC4D = TRUE;
-  state.LC4E = TRUE;
-EXECIN:                       //78.2
-  CP135 = CP136 = CP137 = 0;
-  state.DO62 = TRUE;
-  state.DO05 = TRUE;
-  state.DO64 = TRUE;
-  state.DO61 = TRUE;
-EXECTR:                       //78.3
-  
-  if( state.LC4B == TRUE){ //or LC48
+  logicContol.LC4A = TRUE;    //StandBy initalize
+  logicContol.LC4B = TRUE;    //Ascent not Fast Loop
+  logicContol.LC4C = TRUE;
+  logicContol.LC4D = TRUE;
+  logicContol.LC4E = TRUE;
+EXECIN:                        // 78.2
+  Serial.println("Gemini FC: EXCIN");
+  values.CP135 = values.CP136 = values.CP137 = 0;
+  dout.DO62 = TRUE;           // Start Computaions off 
+  dout.DO05 = TRUE;           // Computer running off, light off
+  dout.DO64 = TRUE;           // Second Engine Cutoff off, light off
+  dout.DO61 = TRUE;           // Gain Change off, light off?
+EXECTR:                       // 78.3
+  Serial.println();
+  Serial.println("Gemini FC: EXECTR LOOP");
+  delay(1000);
+  if( logicContol.LC4B == TRUE){ // Check for Ascent 
     io();  
   }else{
-    ioa();   //ascent falst loop
+    ioa();   //ascent fast loop
   }
   
   gonogo();
@@ -129,21 +135,21 @@ EXECTR:                       //78.3
   
   if( age() == FALSE ) goto EXECTR;
   
-  if( state.LC4B == TRUE){ //or LC48
+  if( logicContol.LC4B == TRUE){ //or LC48
     io();  
   }
   else
   {
-    ioa();  //ascent falst loop
+    ioa();  //ascent fast loop
   }
   
-  if( modeControlDI11() == TRUE ){    //78.5
-    if( modeControlDI10() == TRUE ){
+  if( din.DI11 == TRUE ){    //78.5
+    if( din.DI10 == TRUE ){
       goto STANDBY;                   //93.1
     }
     else                              //78.7
     {
-      if( modeControlDI13() == TRUE ){
+      if( din.DI13 == TRUE ){
         goto ASCENT;                  //59.1
       }
       else
@@ -154,7 +160,7 @@ EXECTR:                       //78.3
   }
   else                                //78.6
   {
-    if( modeControlDI13() == TRUE )
+    if( din.DI13 == TRUE )
     {
         goto RENDEZVOUS;              //1.1
     }
@@ -165,43 +171,57 @@ EXECTR:                       //78.3
   }
 
 STANDBY:                                //93.1
+  Serial.println("Gemini FC: STANDBY");
   //Standby startup
-  if( state.LC4A  == TRUE )
+  if( logicContol.LC4A  == TRUE )
   {
-    state.LC4E = state.LC4B = state.LC4C = state.LC4D = TRUE;
-    state.LC4A = FALSE;
+    Serial.println("Gemini FC: STANDBY Init");
+    logicContol.LC4E = logicContol.LC4B = logicContol.LC4C = logicContol.LC4D = TRUE;
+    logicContol.LC4A = FALSE;
     gimbal.dx = gimbal.dy = gimbal.dz = 0;
-    state.DO05 = TRUE;
+    dout.DO05 = TRUE;
   }
   else
   {
-    //Sanity Check of memory, uses a compiled time checksum? to check memory.
+    //Sanity Check of memory, maybe used while in orbit
   }
   iosub();
   gimbalAngle();
   goto EXECTR;
   
 ASCENT:                                    //59.1
-  if( state.LC4B == TRUE )                 //First pass/initalise 
+  Serial.print("Gemini FC: ASCENT");
+  if( logicContol.LC4B == TRUE )                 //First pass/initalise 
   {
-    state.LC4A = state.LC4C = state.LC4D = state.LC4F = TRUE;
-    state.LC18 = state.LC20 = state.LC21 = state.LC24 = state.LC29 = TRUE;
-    state.LC4B = state.LC17 = FALSE;
+    Serial.print(": Init");
+    logicContol.LC4A = logicContol.LC4C = logicContol.LC4D = logicContol.LC4F = TRUE;
+    logicContol.LC18 = logicContol.LC20 = logicContol.LC21 = logicContol.LC24 = logicContol.LC29 = TRUE;
+    logicContol.LC4B = logicContol.LC17 = FALSE;
   }
   goto EXECTR;
 CATCHUP:
+  Serial.println("Gemini FC: CATCHUP");
   goto EXECTR;
 RENDEZVOUS:
+  Serial.println("Gemini FC: RENDEZVOUS");
   goto EXECTR;
 REENTRY:
+  Serial.println("Gemini FC: REENTRY");
   goto EXECTR;
 //Non Mathflow 7 
-ORBIT_PROGRADE:
+ORBIT_PROGRADE:   //change craft orientation to prograde
+  Serial.println("Gemini FC: PROGRADE");
   goto EXECTR;
-ORBIT_RETROGRADE:
+ORBIT_RETROGRADE: //change craft orientation to retrograde
+  Serial.println("Gemini FC: RETROGRADE");
   goto EXECTR;
-ORBIT_NORMAL:
+ORBIT_NORMAL:     //change craft orientation to orbit normal
+  Serial.println("Gemini FC: ORBIT_NORMAL");
   goto EXECTR;
-ORBIT:
+ORBIT_ANTINORMAL: //change craft orientation to orbit anti normal
+  Serial.println("Gemini FC: ORBIT_ANTINORMAL");
+  goto EXECTR;
+STAR_ALIGN:       //Align Star tracker
+  Serial.println("Gemini FC: STAR_ALIGN");
   goto EXECTR;
 }
