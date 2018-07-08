@@ -29,9 +29,12 @@
 //LC = Logic Control
 struct LOGIC_CONTROL{
   //LC = Logic Control
+   uchar_t LC15:1;    //MDIU
+   uchar_t LC16:1;    //MDIU - Display Status?
    uchar_t LC18:1;
    uchar_t LC20:1;
    uchar_t LC21:1;
+   uchar_t LC23:1;    //MDIU
    uchar_t LC24:1;
    uchar_t LC29:1;
    uchar_t LC17:1;
@@ -85,6 +88,7 @@ struct VALUES
 };
 
 struct DATAIN{
+  int DI04:1;
   /*
    * Mode Control
    *  DI11 + DI10 = Standby
@@ -93,9 +97,13 @@ struct DATAIN{
    *  !DI11 + DI13 = Rendezvous
    *  !DI11 + !DI13 = ReEntry
   */
-  int DI10;     // Mode Control
-  int DI11;     // Mode Control
-  int DI13;     // Mode Control
+  int DI10:1;     // Mode Control
+  int DI11:1;     // Mode Control
+  int DI13:1;     // Mode Control
+  // Start computaions switch
+  // Enter button
+  // cancel button
+  // reset button
   
 };
 
@@ -104,16 +112,19 @@ struct DATAOUT{
   int DO02;   // Pitch resolution control? 
   int DO03;   // Yaw resolution control?
   int DO04;
+  int DO40:1; // insert Light
+  int DO41:1; // display off
   int DO44;   // Yaw ladder buffer
   int DO61;   // Gain Change
   int DO62:1; // start computations light
   int DO05:1; // Computer running ligh
   int DO64:1; // SECO light
+  //malf light
 };
 
 struct DATAOUT dout;
 struct DATAIN  din;
-struct LOGIC_CONTROL logicContol;
+struct LOGIC_CONTROL logicControl;
 struct GIMBAL gimbal;
 struct ACCELERATION accel;
 struct VALUES values;

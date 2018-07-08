@@ -1,3 +1,6 @@
+#include <Key.h>
+#include <Keypad.h>
+
 #include "GeminiStateMachine.h"
 
 void setup() {

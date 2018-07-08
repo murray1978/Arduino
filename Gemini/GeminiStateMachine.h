@@ -12,7 +12,7 @@
 */
 #pragma once
 #include "common.h"
-
+#include "MDIU.h"
 
 void dcsSUB()
 {
@@ -35,13 +35,13 @@ void io(){
 //94.4
 void iosub(){
   Serial.println("Gemini FC: iosub()");
-  if( logicContol.LC17 == FALSE )
+  if( logicControl.LC17 == FALSE )
   {
     return;
   }
-  logicContol.LC17 = FALSE;
+  logicControl.LC17 = FALSE;
 
-  if( logicContol.LC30 == TRUE || logicContol.LC4E == TRUE )
+  if( logicControl.LC30 == TRUE || logicControl.LC4E == TRUE )
   {
     //set:HOPc = L(94.5)
     dcsSUB();
@@ -89,7 +89,7 @@ void mdiuSub()
   Serial.println("Gemini FC: mdiuSub()");
 
   if( din.DI04 == TRUE ){
-  
+    int x =0;
   }
   //55.9
   int cd = 1; //Count of digits inserted
@@ -108,11 +108,11 @@ void geminiFlightLogic()
 {
   Serial.println("Gemini FC: start up");
   //Page 23, COL 78
-  logicContol.LC4A = TRUE;    //StandBy initalize
-  logicContol.LC4B = TRUE;    //Ascent not Fast Loop
-  logicContol.LC4C = TRUE;
-  logicContol.LC4D = TRUE;
-  logicContol.LC4E = TRUE;
+  logicControl.LC4A = TRUE;    //StandBy initalize
+  logicControl.LC4B = TRUE;    //Ascent not Fast Loop
+  logicControl.LC4C = TRUE;
+  logicControl.LC4D = TRUE;
+  logicControl.LC4E = TRUE;
 EXECIN:                        // 78.2
   Serial.println("Gemini FC: EXCIN");
   values.CP135 = values.CP136 = values.CP137 = 0;
@@ -124,7 +124,7 @@ EXECTR:                       // 78.3
   Serial.println();
   Serial.println("Gemini FC: EXECTR LOOP");
   delay(1000);
-  if( logicContol.LC4B == TRUE){ // Check for Ascent 
+  if( logicControl.LC4B == TRUE){ // Check for Ascent 
     io();  
   }else{
     ioa();   //ascent fast loop
@@ -135,7 +135,7 @@ EXECTR:                       // 78.3
   
   if( age() == FALSE ) goto EXECTR;
   
-  if( logicContol.LC4B == TRUE){ //or LC48
+  if( logicControl.LC4B == TRUE){ //or LC48
     io();  
   }
   else
@@ -173,11 +173,11 @@ EXECTR:                       // 78.3
 STANDBY:                                //93.1
   Serial.println("Gemini FC: STANDBY");
   //Standby startup
-  if( logicContol.LC4A  == TRUE )
+  if( logicControl.LC4A  == TRUE )
   {
     Serial.println("Gemini FC: STANDBY Init");
-    logicContol.LC4E = logicContol.LC4B = logicContol.LC4C = logicContol.LC4D = TRUE;
-    logicContol.LC4A = FALSE;
+    logicControl.LC4E = logicControl.LC4B = logicControl.LC4C = logicControl.LC4D = TRUE;
+    logicControl.LC4A = FALSE;
     gimbal.dx = gimbal.dy = gimbal.dz = 0;
     dout.DO05 = TRUE;
   }
@@ -191,12 +191,12 @@ STANDBY:                                //93.1
   
 ASCENT:                                    //59.1
   Serial.print("Gemini FC: ASCENT");
-  if( logicContol.LC4B == TRUE )                 //First pass/initalise 
+  if( logicControl.LC4B == TRUE )                 //First pass/initalise 
   {
     Serial.print(": Init");
-    logicContol.LC4A = logicContol.LC4C = logicContol.LC4D = logicContol.LC4F = TRUE;
-    logicContol.LC18 = logicContol.LC20 = logicContol.LC21 = logicContol.LC24 = logicContol.LC29 = TRUE;
-    logicContol.LC4B = logicContol.LC17 = FALSE;
+    logicControl.LC4A = logicControl.LC4C = logicControl.LC4D = logicControl.LC4F = TRUE;
+    logicControl.LC18 = logicControl.LC20 = logicControl.LC21 = logicControl.LC24 = logicControl.LC29 = TRUE;
+    logicControl.LC4B = logicControl.LC17 = FALSE;
   }
   goto EXECTR;
 CATCHUP:
