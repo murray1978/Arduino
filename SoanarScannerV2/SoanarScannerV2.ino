@@ -3,7 +3,7 @@
     Stand Alone version
     By Murray Smith 2018
 
-    
+
     Data is stored on SDCARD or sent to a PC via usb-serial
 
     TODO:
@@ -33,20 +33,20 @@ static int siVersion = 4;    //read as 0.2, ie 10 = 1.0
 
 
 /*
- * Character buffer size,
- * Leave at this size any lower and sprintf falls over
- */
-#define MAX_CHAR_BUFFER 100
+   Character buffers.
+*/
+#define MAX_CHAR_BUFFER 256/2
 char cBuffer[MAX_CHAR_BUFFER] = { 0 };
+char fBuffer[32] = {0};                 //float buffer
 
 /*
- * Vertical angle Servo
- */
+   Vertical angle Servo
+*/
 #define ASCPIN 9          // Ascention Servo pin, vertical angle
 #define ASCMAX 60         // Assention, vertical angle
-#define ASCMIN 0
-int ascDecValue = -1;       // used to reverse servo 
-int posAsc = 0;           // assention servo position 
+#define ASCMIN 30
+int ascDecValue = -1;       // used to reverse servo
+int posAsc = 0;           // assention servo position
 Servo asc;
 
 /*
@@ -68,16 +68,16 @@ Stepper decStepper( STEPS, 4, 5, 6, 7);
    Using a HC-SR04 ultrasonic sensor
    can be used in 3 pin mode if you run out of pins
 */
-static int TRIGPIN = 3;
-static int ECHOPIN = 2;
-static int MAXDISTANCE = 400;
-int iterations = 10;
+#define TRIGPIN 3
+#define ECHOPIN 2
+#define MAXDISTANCE 400
+#define ITERATIONS 10
 NewPing sonar( TRIGPIN, ECHOPIN, MAXDISTANCE);
 
 /*
    DHT22, NOTE: Change to DHT11 sensor if you are using that
 */
-static int DHTPIN = 8;
+#define DHTPIN 8
 float humidity = 0.0f;
 float temp = 0.0f;
 DHT dht( DHTPIN, DHT22);
@@ -86,8 +86,8 @@ DHT dht( DHTPIN, DHT22);
    Distance calculation
 */
 static float c = 331.4f;   // Speed of sound at 0C and 0%(?) humidity
-float deltaT;              // Time Delay
-float distance;
+float deltaT = 0.0f;              // Time Delay
+float distance = 0.0f;
 
 /*
    SD Card
@@ -99,7 +99,6 @@ const int chipSelect = 10;  //change for your brand of SD Card reader
 */
 File dataFile;
 File root;
-char cXYZUserFileName[MAX_CHAR_BUFFER] = {0};
 char cXYZDefaultFileName[] = "sonar.xyz";
 char cXYZFileName[] = "sonar";
 char cXYZExtension[] = ".xyz";
@@ -126,14 +125,13 @@ static int LIMIT_LEFT  = 1;
 */
 float calcRange( float dTime ) {
   float speedSound = c + ( 0.606f * temp) + ( 0.0124f * humidity );
-  return float(( dTime / 2.0f) * (speedSound / 10000.0f));
+  return (float)(( dTime / 2.0f) * (speedSound / 10000.0f));
 }
 
 /*
    Send current/default params via serial
 */
 void sendParams() {
-  //siVersion, temp, humidity
   sprintf( cBuffer, "%i,%i,%i\n", siVersion, temp, humidity);
   Serial.print(cBuffer);
 }
@@ -159,29 +157,25 @@ void sendHumidity() {
 */
 void setupDataFile() {
 
-  Serial.println("MSG: Setting up output file");
-
-  //Are we using a user entered file name?
-  if ( strlen(cXYZUserFileName) == 0 ) {
+  //Serial.println("MSG: Setting up output file");
 
     int i = 0;
 
     //Copy defalut file name to
-    strcpy( cXYZUserFileName, cXYZDefaultFileName);
+    strcpy( cBuffer, cXYZDefaultFileName);
 
     // and check if it exsists
-    while (SD.exists(cXYZUserFileName) )
+    while (SD.exists(cBuffer) )
     {
-      Serial.print("MSG: ");
-      Serial.print(cXYZUserFileName);
-      Serial.println(" exsists'");
+      //Serial.print("MSG: ");
+      Serial.print(cBuffer);
+      //Serial.println(" exsists'");
       //Append number to file name
-      sprintf( cXYZUserFileName, "%s%i%s", cXYZFileName, i++ , cXYZExtension );
+      sprintf( cBuffer, "%s%i%s", cXYZFileName, i++ , cXYZExtension );
     }
-  }
 
-  Serial.print("MSG: "); Serial.print("opening "); Serial.println(cXYZUserFileName);
-  dataFile = SD.open(cXYZUserFileName, FILE_WRITE);
+  //Serial.print("MSG: "); Serial.print("opening "); Serial.println(cBuffer);
+  dataFile = SD.open(cBuffer, FILE_WRITE);
 
   if ( !dataFile ) {
     Serial.println("FATAL: could not open data file");
@@ -221,13 +215,14 @@ void setup() {
 
 
   if ( !SD.begin(chipSelect)) {
-    Serial.println("ERROR: SD Card not present or wrong chip select pin selected");
-    return;
+   // Serial.println("ERROR: SD Card not present or wrong chip select pin selected");
+    //Serial.println("MSG: defaulting to serial output");
+    bXYZBySdCard = false;
   } else {
-    Serial.println("MSG: SD Card Present");
+    //Serial.println("MSG: SD Card Present");
+    setupDataFile();
+    bXYZBySdCard = true;
   }
-
-  setupDataFile();
 
   decStepper.setSpeed(SPEED);
   zeroRight();
@@ -237,7 +232,7 @@ void setup() {
   temp = dht.readTemperature();
 
   bXYZBySerial = true;          // Send data via serial
-  bXYZBySdCard = true;          // and/or to SD Card
+
 }
 
 /*
@@ -254,9 +249,9 @@ void processSonar() {
     //What happens if we hit a limit switch?
     decStepper.step(-STEPSPERDEG);
     
-    float range = calcRange(sonar.ping_median(iterations));
-    sprintf(cBuffer, "%i,%i,%\n", posDec, posAsc, (float)range );
-   
+    dtostrf( calcRange(sonar.ping_median(ITERATIONS)), 5, 2, fBuffer); //sprintf does not support %f in arduino 
+    sprintf(cBuffer, "%i,%i,%s\n", posDec, posAsc, fBuffer);
+
     if (bXYZBySerial) {
       Serial.print( cBuffer );
     }
@@ -269,7 +264,7 @@ void processSonar() {
       Serial.println("ERROR: no data destination selected");
     }
   }
-  
+
   zeroRight();
 
   if ( posAsc >= ASCMAX ) {
@@ -277,7 +272,9 @@ void processSonar() {
   } else if ( posAsc <= ASCMIN )
   {
     ascDecValue = 1;
-    dataFile.close();
+    if ( dataFile) {
+      dataFile.close();
+    }
     Serial.println("Scann finished");
     while (true);            //TODO replace with return
   }
