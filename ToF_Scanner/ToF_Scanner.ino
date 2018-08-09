@@ -1,8 +1,7 @@
 /*
-    Sonar Scanner V2
+    ToF Scanner
     Stand Alone version
     By Murray Smith 2018
-
 
     Data is stored on SDCARD or sent to a PC via usb-serial
 
@@ -15,24 +14,18 @@
 */
 
 #include <Servo.h>
-#include <NewPing.h>
-#include <DHT.h>
 #include <SPI.h>
 #include <SD.h>
 #include <Stepper.h>
+#include <Math.h>
 
 //Current program version
-static int siVersion = 4;    //read as 0.2, ie 10 = 1.0
+static int siVersion = 1;    //read as 0.2, ie 10 = 1.0
 
 //Serial Commands
 #define SETUP         0
 #define START         2
 #define STOP          4
-
-#define SEND_TEMP     6
-#define SEND_HUMIDITY 8
-#define SEND_DATA     2
-
 
 /*
    Character buffers.
@@ -66,35 +59,9 @@ Stepper decStepper( STEPS, 4, 5, 6, 7);
 
 
 /*
-   Ultrasonic sensor
-   Using a HC-SR04 ultrasonic sensor
-   can be used in 3 pin mode if you run out of pins
-*/
-#define TRIGPIN 3
-#define ECHOPIN 2
-#define MAXDISTANCE 400
-#define ITERATIONS 10
-NewPing sonar( TRIGPIN, ECHOPIN, MAXDISTANCE);
-
-/*
-   DHT22, NOTE: Change to DHT11 sensor if you are using that
-*/
-#define DHTPIN 8
-float humidity = 0.0f;
-float temp = 0.0f;
-DHT dht( DHTPIN, DHT22);
-
-/*
-   Distance calculation
-*/
-static float c = 331.4f;   // Speed of sound at 0C and 0%(?) humidity
-float deltaT = 0.0f;              // Time Delay
-float distance = 0.0f;
-
-/*
    SD Card
 */
-const int chipSelect = 10;  //change for your brand of SD Card reader
+#define SDCARD_CS 10  //change for your brand of SD Card reader
 
 /*
    Local SD Card Storage
@@ -125,9 +92,8 @@ static int LIMIT_LEFT  = 1;
    Given a time of flight for a sonar "pulse" calculate distance
    using current humidity and tempurature
 */
-float calcRange( float dTime ) {
-  float speedSound = c + ( 0.606f * temp) + ( 0.0124f * humidity );
-  return (float)(( dTime / 2.0f) * (speedSound / 10000.0f));
+float getRange( ) {
+  return 2.0f;
 }
 
 /*
@@ -209,14 +175,12 @@ void zeroRight() {
 */
 void setup() {
 
-  asc.attach(ASCPIN);
   Serial.begin(115200);
-  dht.begin();
   posAsc = ASCMAX;
   asc.write(posAsc);
 
 
-  if ( !SD.begin(chipSelect)) {
+  if ( !SD.begin(SDCARD_CS)) {
    // Serial.println("ERROR: SD Card not present or wrong chip select pin selected");
     //Serial.println("MSG: defaulting to serial output");
     bXYZBySdCard = false;
@@ -229,10 +193,6 @@ void setup() {
   decStepper.setSpeed(SPEED);
   zeroRight();
 
-  //Inital read of DHT22
-  humidity = dht.readHumidity();
-  temp = dht.readTemperature();
-
   bXYZBySerial = true;          // Send data via serial
 
 }
@@ -242,17 +202,26 @@ void setup() {
    decStepper.step(1);
 */
 void processSonar() {
-
-  humidity = dht.readHumidity();
-  temp = dht.readTemperature();
-
+  
+  float x, y, z;
+  float range;
+  char xBuff[25] = { 0 };
+  char yBuff[25] = { 0 };
+  char zBuff[25] = { 0 };
 
   for (posDec = DECMIN; posDec <= DECMAX; posDec += 1) { // goes from DECMIN degrees to DECMAX degrees
     //What happens if we hit a limit switch?
     decStepper.step(-STEPSPERDEG);
+    range = getRange(); 
+
+    x = (float)(range * sin(degToRad(posDec)) * cos(degToRad(posAsc)));                 
+    y = (float)(range * sin(degToRad(posDec)) * sin(degToRad(posAsc)));
+    z = (float)(range * cos(degToRad(posDec)));
     
-    dtostrf( calcRange(sonar.ping_median(ITERATIONS)), 5, 2, fBuffer); //sprintf does not support %f in arduino 
-    sprintf(cBuffer, "%i,%i,%s\n", posDec, posAsc, fBuffer);
+    dtostrf( x, 5, 2, xBuff); 
+    dtostrf( y, 5, 2, yBuff); 
+    dtostrf( z, 5, 2, zBuff); 
+    sprintf(cBuffer, "%s,%s,%s\n", xBuff, yBuff, zBuff);
 
     if (bXYZBySerial) {
       Serial.print( cBuffer );
