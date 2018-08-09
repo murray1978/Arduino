@@ -3,12 +3,13 @@
     Stand Alone version
     By Murray Smith 2018
 
+    
     Data is stored on SDCARD or sent to a PC via usb-serial
 
     TODO:
       +Serial commands, to/from sonar firmware
       +Keypad commands in via LCD/Keypad Sheild,
-      +Status out via LCD Sheild
+      +Status out via a Serial LCD
 */
 
 #include <Servo.h>
@@ -31,20 +32,21 @@ static int siVersion = 4;    //read as 0.2, ie 10 = 1.0
 #define SEND_DATA     2
 
 
-//Character buffer size
-#define MAX_CHAR_BUFFER 80
+/*
+ * Character buffer size,
+ * Leave at this size any lower and sprintf falls over
+ */
+#define MAX_CHAR_BUFFER 100
 char cBuffer[MAX_CHAR_BUFFER] = { 0 };
 
-//Vertical angle Servo
-static int ASCPIN = 9;      // Ascention Servo pin, vertical angle
-int posDec = 0;             // Declination servo position 0-180 deg, Horizontal angle
-int posAsc = 0;             // assention servo position   0-180 deg, Vertical angle
-int ascDecValue = -1;
-static int ASCMAX = 60;    // Assention, vertical angle
-static int ASCMIN = 0;
-static int DECMAX = 90;    // Declanation, horizontal angle
-static int DECMIN = 0;
-
+/*
+ * Vertical angle Servo
+ */
+#define ASCPIN 9          // Ascention Servo pin, vertical angle
+#define ASCMAX 60         // Assention, vertical angle
+#define ASCMIN 0
+int ascDecValue = -1;       // used to reverse servo 
+int posAsc = 0;           // assention servo position 
 Servo asc;
 
 /*
@@ -55,6 +57,9 @@ Servo asc;
 #define STEPS 4096     // 1 revolution of the OUTPUT shaft 
 #define STEPSPERDEG 6  // A guess, should be about 7.something
 #define SPEED 5        // Trial and error........your milage may vary
+#define DECMAX 90    // Declanation, horizontal angle
+#define DECMIN 0
+int posDec = 0;             // Declination servo position 0-180 deg, Horizontal angle
 Stepper decStepper( STEPS, 4, 5, 6, 7);
 
 
@@ -248,11 +253,12 @@ void processSonar() {
   for (posDec = DECMIN; posDec <= DECMAX; posDec += 1) { // goes from DECMIN degrees to DECMAX degrees
     //What happens if we hit a limit switch?
     decStepper.step(-STEPSPERDEG);
-
-    sprintf(cBuffer, "%i,%i,%d\n", posDec, posAsc, calcRange(sonar.ping_median(iterations)));
-
+    
+    float range = calcRange(sonar.ping_median(iterations));
+    sprintf(cBuffer, "%i,%i,%\n", posDec, posAsc, (float)range );
+   
     if (bXYZBySerial) {
-      Serial.println( cBuffer );
+      Serial.print( cBuffer );
     }
     else if (bXYZBySdCard ) {
       dataFile.print(cBuffer);
@@ -262,23 +268,24 @@ void processSonar() {
     {
       Serial.println("ERROR: no data destination selected");
     }
-
-    zeroRight();
-
-    if ( posAsc >= ASCMAX ) {
-      ascDecValue = -1;
-    } else if ( posAsc <= ASCMIN )
-    {
-      ascDecValue = 1;
-      dataFile.close();
-      Serial.println("Scann finished");
-      while (true);            //TODO replace with return
-    }
-
-    posAsc = posAsc + ascDecValue;
-    asc.write(posAsc);
   }
+  
+  zeroRight();
+
+  if ( posAsc >= ASCMAX ) {
+    ascDecValue = -1;
+  } else if ( posAsc <= ASCMIN )
+  {
+    ascDecValue = 1;
+    dataFile.close();
+    Serial.println("Scann finished");
+    while (true);            //TODO replace with return
+  }
+
+  posAsc = posAsc + ascDecValue;
+  asc.write(posAsc);
 }
+
 /*
 
 */
