@@ -93,39 +93,17 @@ static int LIMIT_LEFT  = 1;
    using current humidity and tempurature
 */
 float getRange( ) {
-  return 2.0f;
+  return (float)1.0f;
 }
 
-/*
-   Send current/default params via serial
-*/
-void sendParams() {
-  sprintf( cBuffer, "%i,%i,%i\n", siVersion, temp, humidity);
-  Serial.print(cBuffer);
-}
 
-/*
-   Send tempurature via serial
-*/
-void sendTemp() {
-  sprintf( cBuffer, "%i\n", temp );
-  Serial.print(cBuffer);
-}
-
-/*
-   Send humidity via serial
-*/
-void sendHumidity() {
-  sprintf( cBuffer, "%i\n", humidity );
-  Serial.print(cBuffer);
-}
 
 /*
    setupDataFile, if a file exists, append next number in sequence to new file.
 */
 void setupDataFile() {
 
-  //Serial.println("MSG: Setting up output file");
+  Serial.println("MSG: Setting up output file");
 
     int i = 0;
 
@@ -135,14 +113,14 @@ void setupDataFile() {
     // and check if it exsists
     while (SD.exists(cBuffer) )
     {
-      //Serial.print("MSG: ");
+      Serial.print("MSG: ");
       Serial.print(cBuffer);
-      //Serial.println(" exsists'");
+      Serial.println(" exsists'");
       //Append number to file name
       sprintf( cBuffer, "%s%i%s", cXYZFileName, i++ , cXYZExtension );
     }
 
-  //Serial.print("MSG: "); Serial.print("opening "); Serial.println(cBuffer);
+  Serial.print("MSG: "); Serial.print("opening "); Serial.println(cBuffer);
   dataFile = SD.open(cBuffer, FILE_WRITE);
 
   if ( !dataFile ) {
@@ -174,18 +152,20 @@ void zeroRight() {
    Setup the hardware.
 */
 void setup() {
-
+  
+  asc.attach(ASCPIN);
   Serial.begin(115200);
   posAsc = ASCMAX;
   asc.write(posAsc);
 
+  bXYZBySdCard = true;
 
   if ( !SD.begin(SDCARD_CS)) {
-   // Serial.println("ERROR: SD Card not present or wrong chip select pin selected");
-    //Serial.println("MSG: defaulting to serial output");
+    Serial.println("ERROR: SD Card not present or wrong chip select pin selected");
+    Serial.println("MSG: defaulting to serial output");
     bXYZBySdCard = false;
   } else {
-    //Serial.println("MSG: SD Card Present");
+    Serial.println("MSG: SD Card Present");
     setupDataFile();
     bXYZBySdCard = true;
   }
@@ -194,7 +174,12 @@ void setup() {
   zeroRight();
 
   bXYZBySerial = true;          // Send data via serial
+  delay(5000);
+}
 
+double degToRad(float deg)
+{
+  return (double)(deg * (PI / 180.0f));
 }
 
 /*
@@ -212,25 +197,32 @@ void processSonar() {
   for (posDec = DECMIN; posDec <= DECMAX; posDec += 1) { // goes from DECMIN degrees to DECMAX degrees
     //What happens if we hit a limit switch?
     decStepper.step(-STEPSPERDEG);
+    
     range = getRange(); 
 
-    x = (float)(range * sin(degToRad(posDec)) * cos(degToRad(posAsc)));                 
-    y = (float)(range * sin(degToRad(posDec)) * sin(degToRad(posAsc)));
-    z = (float)(range * cos(degToRad(posDec)));
+   /* x = (float)((float)range * sin(degToRad((double)posDec)) * cos(degToRad((double)posAsc)));                 
+    y = (float)((float)range * sin(degToRad((double)posDec)) * sin(degToRad((double)posAsc)));
+    z = (float)((float)range * cos(degToRad((double)posDec)));
+    */
+
+    x = (range * sin(degToRad(posAsc)) * cos(degToRad(posDec)));                 
+    y = (range * sin(degToRad(posDec)) * sin(degToRad(posAsc)));
+    z = (range * cos(degToRad(posAsc)));
     
-    dtostrf( x, 5, 2, xBuff); 
-    dtostrf( y, 5, 2, yBuff); 
-    dtostrf( z, 5, 2, zBuff); 
+    dtostrf( x, 8, 5, xBuff); 
+    dtostrf( y, 8, 5, yBuff); 
+    dtostrf( z, 8, 5, zBuff); 
     sprintf(cBuffer, "%s,%s,%s\n", xBuff, yBuff, zBuff);
 
     if (bXYZBySerial) {
       Serial.print( cBuffer );
     }
-    else if (bXYZBySdCard ) {
+    if (bXYZBySdCard ) {
+      //Serial.println("Writing to SD Card");
       dataFile.print(cBuffer);
       dataFile.flush();
     }
-    else
+    if( !bXYZBySdCard || !bXYZBySerial)
     {
       Serial.println("ERROR: no data destination selected");
     }
@@ -243,15 +235,16 @@ void processSonar() {
   } else if ( posAsc <= ASCMIN )
   {
     ascDecValue = 1;
-    if ( dataFile) {
+    //if ( dataFile) {
       dataFile.close();
-    }
+    //}
     Serial.println("Scann finished");
     while (true);            //TODO replace with return
   }
 
   posAsc = posAsc + ascDecValue;
   asc.write(posAsc);
+  delay(20);  //wait untill servo has moved
 }
 
 /*
