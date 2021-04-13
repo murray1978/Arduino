@@ -29,9 +29,9 @@ char cBuffer[MAX_CHAR_BUFFER] = { 0 };
 /*
    Vertical axis Servo
 */
-#define ASCPIN 10          // Ascention Servo pin, vertical angle
-#define ASCMAX 100         // Assention, vertical angle
-#define ASCMIN 10
+#define ASCPIN 10         // Ascention Servo pin, vertical angle
+#define ASCMAX 90         // Assention, vertical angle
+#define ASCMIN 45
 int ascDecValue = -1;       // used to reverse servo
 int posAsc = 0;           // assention servo position
 Servo asc;
@@ -39,8 +39,8 @@ Servo asc;
 /*
   horizontal Axis Servo
 */
-#define DECMAX 90    // Declanation, horizontal angle
-#define DECMIN 0
+#define DECMAX (180-45)    // Declanation, horizontal angle
+#define DECMIN 45
 #define DECPIN 9
 int posDec = 0;             // Declination servo position 0-180 deg, Horizontal angle
 Servo dec;
@@ -87,27 +87,32 @@ void setup() {
 
   if (VL53L0X_ERROR_NONE != Status)
   {
-    Serial.println("start vl53l0x mesurement failed!");
+    Serial.println("vl53l0x failed with error!");
     VL53L0X.print_pal_error(Status);
     while (1);
   }
   
   VL53L0X.VL53L0X_long_distance_ranging_init();
-  
-  if (VL53L0X_ERROR_NONE != Status)
-  {
-    Serial.println("start vl53l0x mesurement failed!");
-    VL53L0X.print_pal_error(Status);
-    while (1);
-  }
-
-
+  VL53L0X.VL53L0X_SetTimingBudgetMicroSeconds(66000);
   delay(500);
 }
 
 double degToRad(float deg)
 {
   return (double)(deg * (PI / 180.0f));
+}
+
+void stripSpace(char *str){
+  int count = 0;
+
+  for( int i = 0; str[i]; i++ )
+  {
+    if( str[i] != ' ' )
+    {
+      str[count++] = str[i];
+    }
+  }
+  str[count] = '\0';
 }
 
 /*
@@ -131,22 +136,23 @@ void processSonar() {
       z = (float)((float)range * cos(degToRad((double)posDec)));
     */
 
-    x = (range * sin(degToRad(posAsc)) * cos(degToRad(posDec)));
+    x = (range * sin(degToRad(posDec)) * cos(degToRad(posAsc)));
     y = (range * sin(degToRad(posDec)) * sin(degToRad(posAsc)));
-    z = (range * cos(degToRad(posAsc)));
+    z = (range * cos(degToRad(posDec)));
 
     dtostrf( x, 8, 5, xBuff);
     dtostrf( y, 8, 5, yBuff);
     dtostrf( z, 8, 5, zBuff);
 
     sprintf(cBuffer, "%s,%s,%s\n", xBuff, yBuff, zBuff);
+    stripSpace(cBuffer);
     Serial.print( cBuffer );
 
   }
 
   for (posDec = DECMAX; posDec >= DECMIN; posDec -= 1) { // goes from DECMAX degrees to DECMIN degrees
     dec.write(posDec);              // tell servo to go to position in variable 'pos'
-    delay(20);                       // waits 15ms for the servo to reach the position
+    delay(15);                       // waits 15ms for the servo to reach the position
   }
 
   if ( posAsc >= ASCMAX ) {

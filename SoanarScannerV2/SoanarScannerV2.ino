@@ -215,11 +215,11 @@ void setup() {
 
 
   if ( !SD.begin(chipSelect)) {
-   // Serial.println("ERROR: SD Card not present or wrong chip select pin selected");
-    //Serial.println("MSG: defaulting to serial output");
+    Serial.println("ERROR: SD Card not present or wrong chip select pin selected");
+    Serial.println("MSG: defaulting to serial output");
     bXYZBySdCard = false;
   } else {
-    //Serial.println("MSG: SD Card Present");
+    Serial.println("MSG: SD Card Present");
     setupDataFile();
     bXYZBySdCard = true;
   }
@@ -292,4 +292,3 @@ void processSerialIn() {
 void loop() {
   processSonar();
 }
-
